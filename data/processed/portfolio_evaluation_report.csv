@@ -1,0 +1,19 @@
+category,metric,value
+CLV,MAE,0.9216370598722974
+CLV,RMSE,17.29639071768712
+CLV,R2,0.0729325293995784
+CLV,Mean Actual Future Revenue,0.9340009616134313
+CLV,Mean Predicted Future Revenue,0.06758658092142796
+CLV,Total Actual Future Revenue,71875.10999999999
+CLV,Total Predicted Future Revenue,5201.057748227567
+Retention Opportunity,High-value inactive customers,6012.0
+Retention Opportunity,Predicted revenue at opportunity,344.854390961
+Retention Opportunity,Average predicted value,0.05736100980721889
+Retention Opportunity,Average recency,483.4965146058192
+Portfolio KPI,Customers,96096.0
+Portfolio KPI,Predicted Future Revenue,5201.057748227566
+Portfolio KPI,Average Predicted Customer Value,0.05412356131605442
+Portfolio KPI,Critical Retention Customers,6012.0
+Portfolio KPI,High Retention Customers,7902.0
+Portfolio KPI,High-Value Inactive Customers,6012.0
+Portfolio KPI,Recommendation Rows,3640.0

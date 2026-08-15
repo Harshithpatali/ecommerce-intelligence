@@ -1,0 +1,9 @@
+feature,mean_abs_shap
+historical_average_order_value,0.019129787
+historical_revenue,0.018156104
+historical_recency_days,0.017669464
+historical_item_count,0.005178053
+historical_orders_per_active_day,0.0032213544
+historical_average_items_per_order,0.0028795484
+historical_order_count,0.0023516885
+historical_unique_products,0.0013906219

@@ -66,14 +66,6 @@ temp/
 # Olist raw CSV files are kept locally and are NOT committed.
 data/raw/
 
-# ------------------------------------------------------------
-# Generated processed datasets
-# ------------------------------------------------------------
-# Large/generated analytical outputs are kept locally.
-data/processed/*.csv
-data/processed/*.parquet
-data/processed/*.xlsx
-data/processed/**/*.json
 
 # ------------------------------------------------------------
 # Reports / exports
@@ -90,21 +82,12 @@ downloads/
 *.sqlite
 *.sqlite3
 
-# ------------------------------------------------------------
-# Model experiments / checkpoints
-# ------------------------------------------------------------
-models/experiments/
-models/checkpoints/
-models/tmp/
 
 # ------------------------------------------------------------
 # IMPORTANT:
 # Production .joblib model artifacts ARE intentionally tracked.
 #
-# models/
-#   clv_xgboost.joblib
-#   customer_segmentation.joblib
-#   recommendation_artifact.joblib
+
 # ------------------------------------------------------------
 
 # ------------------------------------------------------------

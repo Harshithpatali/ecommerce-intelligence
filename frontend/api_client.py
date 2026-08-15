@@ -1,32 +1,56 @@
 """
 FastAPI client used by the Streamlit frontend.
 
-The Streamlit application communicates with the backend only through this
-module. This keeps HTTP handling out of individual dashboard pages.
+The Streamlit application communicates with the FastAPI backend only through
+this module. This keeps HTTP handling out of individual dashboard pages.
 
-Environment variable:
-    BACKEND_URL
-        Local default: http://localhost:8000
+Production configuration:
+    BACKEND_URL must be configured in Streamlit Cloud Secrets.
+
+Example Streamlit Secret:
+
+    BACKEND_URL = "https://ecommerce-intelligence-xod0.onrender.com"
 """
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 import requests
+import streamlit as st
 
-from dotenv import load_dotenv
 
-load_dotenv()
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
 
-BACKEND_URL = os.getenv(
-    "BACKEND_URL",
-    "http://localhost:8000",
-).rstrip("/")
+def get_backend_url() -> str:
+    """
+    Get the production FastAPI backend URL from Streamlit Secrets.
+
+    BACKEND_URL must be configured in Streamlit Cloud.
+    """
+
+    try:
+        backend_url = st.secrets["BACKEND_URL"]
+    except Exception as exc:
+        raise RuntimeError(
+            "BACKEND_URL is not configured in Streamlit Secrets. "
+            "Please add BACKEND_URL to the Streamlit app secrets."
+        ) from exc
+
+    backend_url = str(backend_url).strip().rstrip("/")
+
+    if not backend_url:
+        raise RuntimeError(
+            "BACKEND_URL is empty. "
+            "Please configure a valid FastAPI backend URL."
+        )
+
+    return backend_url
+
+
+BACKEND_URL = get_backend_url()
 
 DEFAULT_TIMEOUT = 30
 
@@ -54,13 +78,20 @@ class APIClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
+    # -----------------------------------------------------------------------
+    # INTERNAL REQUEST
+    # -----------------------------------------------------------------------
+
     def _request(
         self,
         method: str,
         path: str,
         **kwargs: Any,
     ) -> requests.Response:
-        """Execute an HTTP request and normalize backend failures."""
+        """
+        Execute an HTTP request and normalize backend failures.
+        """
+
         url = f"{self.base_url}{path}"
 
         try:
@@ -70,17 +101,40 @@ class APIClient:
                 timeout=self.timeout,
                 **kwargs,
             )
-        except requests.RequestException as exc:
+
+        except requests.Timeout as exc:
             raise APIClientError(
-                f"Unable to connect to backend: {exc}"
+                f"Backend request timed out after "
+                f"{self.timeout} seconds: {url}"
             ) from exc
 
+        except requests.ConnectionError as exc:
+            raise APIClientError(
+                f"Unable to connect to backend: {url}"
+            ) from exc
+
+        except requests.RequestException as exc:
+            raise APIClientError(
+                f"Backend request failed: {exc}"
+            ) from exc
+
+        # -------------------------------------------------------------------
+        # HTTP ERROR HANDLING
+        # -------------------------------------------------------------------
+
         if not response.ok:
+
             try:
-                detail = response.json().get(
-                    "detail",
-                    response.text,
-                )
+                error_data = response.json()
+
+                if isinstance(error_data, dict):
+                    detail = error_data.get(
+                        "detail",
+                        response.text,
+                    )
+                else:
+                    detail = response.text
+
             except ValueError:
                 detail = response.text
 
@@ -91,12 +145,19 @@ class APIClient:
 
         return response
 
+    # -----------------------------------------------------------------------
+    # GET
+    # -----------------------------------------------------------------------
+
     def get(
         self,
         path: str,
         params: dict[str, Any] | None = None,
     ) -> Any:
-        """GET JSON data from the backend."""
+        """
+        Send a GET request and return JSON.
+        """
+
         response = self._request(
             "GET",
             path,
@@ -105,17 +166,25 @@ class APIClient:
 
         try:
             return response.json()
+
         except ValueError as exc:
             raise APIClientError(
                 "Backend returned an invalid JSON response."
             ) from exc
+
+    # -----------------------------------------------------------------------
+    # POST
+    # -----------------------------------------------------------------------
 
     def post(
         self,
         path: str,
         payload: dict[str, Any] | None = None,
     ) -> Any:
-        """POST JSON data to the backend."""
+        """
+        Send a POST request and return JSON.
+        """
+
         response = self._request(
             "POST",
             path,
@@ -124,17 +193,24 @@ class APIClient:
 
         try:
             return response.json()
+
         except ValueError as exc:
             raise APIClientError(
                 "Backend returned an invalid JSON response."
             ) from exc
 
+    # -----------------------------------------------------------------------
+    # HEALTH
+    # -----------------------------------------------------------------------
+
     def health(self) -> dict[str, Any]:
         """Return backend health information."""
+
         return self.get("/health")
 
     def artifact_health(self) -> dict[str, Any]:
         """Return analytical artifact availability."""
+
         return self.get("/health/artifacts")
 
     # -----------------------------------------------------------------------
@@ -145,7 +221,8 @@ class APIClient:
         self,
         features: dict[str, Any],
     ) -> dict[str, Any]:
-        """Predict future revenue for one customer."""
+        """Predict future customer lifetime value."""
+
         return self.post(
             "/api/v1/predict",
             features,
@@ -155,7 +232,8 @@ class APIClient:
         self,
         customers: list[dict[str, Any]],
     ) -> dict[str, Any]:
-        """Predict future revenue for multiple customers."""
+        """Predict CLV for multiple customers."""
+
         return self.post(
             "/api/v1/predict/batch",
             {"customers": customers},
@@ -163,12 +241,13 @@ class APIClient:
 
     def model_info(self) -> dict[str, Any]:
         """Return CLV model metadata."""
+
         return self.get(
             "/api/v1/predict/model-info"
         )
 
     # -----------------------------------------------------------------------
-    # SHAP
+    # SHAP EXPLAINABILITY
     # -----------------------------------------------------------------------
 
     def explain_customer(
@@ -176,7 +255,8 @@ class APIClient:
         features: dict[str, Any],
         top_n: int = 5,
     ) -> dict[str, Any]:
-        """Return a customer-level SHAP explanation."""
+        """Return customer-level SHAP explanation."""
+
         payload = {
             **features,
             "top_n": top_n,
@@ -192,6 +272,7 @@ class APIClient:
         top_n: int = 10,
     ) -> list[dict[str, Any]]:
         """Return global SHAP feature importance."""
+
         return self.get(
             "/api/v1/explain/global",
             params={"top_n": top_n},
@@ -207,6 +288,7 @@ class APIClient:
         k: int = 10,
     ) -> dict[str, Any]:
         """Return personalized product recommendations."""
+
         return self.get(
             f"/api/v1/recommendations/{customer_id}",
             params={"k": k},
@@ -218,6 +300,7 @@ class APIClient:
         k: int = 10,
     ) -> dict[str, Any]:
         """Return precomputed product recommendations."""
+
         return self.get(
             f"/api/v1/recommendations/{customer_id}/saved",
             params={"k": k},
@@ -228,6 +311,7 @@ class APIClient:
         customer_id: str,
     ) -> dict[str, Any]:
         """Return customer purchase history."""
+
         return self.get(
             f"/api/v1/recommendations/{customer_id}/history"
         )
@@ -236,6 +320,7 @@ class APIClient:
         self,
     ) -> dict[str, Any]:
         """Return recommendation-system metadata."""
+
         return self.get(
             "/api/v1/recommendations/metadata"
         )
@@ -248,6 +333,7 @@ class APIClient:
         self,
     ) -> dict[str, Any]:
         """Return portfolio KPIs."""
+
         return self.get(
             "/api/v1/business/summary"
         )
@@ -256,6 +342,7 @@ class APIClient:
         self,
     ) -> list[dict[str, Any]]:
         """Return retention-priority summary."""
+
         return self.get(
             "/api/v1/business/retention-priorities"
         )
@@ -264,6 +351,7 @@ class APIClient:
         self,
     ) -> list[dict[str, Any]]:
         """Return recommended retention actions."""
+
         return self.get(
             "/api/v1/business/actions"
         )
@@ -273,6 +361,7 @@ class APIClient:
         customer_id: str,
     ) -> dict[str, Any]:
         """Return retention intelligence for one customer."""
+
         return self.get(
             f"/api/v1/business/customer/{customer_id}"
         )
@@ -282,6 +371,7 @@ class APIClient:
         limit: int = 50,
     ) -> list[dict[str, Any]]:
         """Return high-value inactive customers."""
+
         return self.get(
             "/api/v1/business/high-value-inactive",
             params={"limit": limit},
@@ -291,6 +381,7 @@ class APIClient:
         self,
     ) -> list[dict[str, Any]]:
         """Return customer segment metrics."""
+
         return self.get(
             "/api/v1/business/segments"
         )
@@ -299,6 +390,7 @@ class APIClient:
         self,
     ) -> list[dict[str, Any]]:
         """Return end-to-end model evaluation results."""
+
         return self.get(
             "/api/v1/business/evaluation"
         )
@@ -307,6 +399,7 @@ class APIClient:
         self,
     ) -> dict[str, Any]:
         """Return business-service metadata."""
+
         return self.get(
             "/api/v1/business/metadata"
         )
@@ -319,6 +412,7 @@ class APIClient:
         self,
     ) -> dict[str, Any]:
         """Return Groq AI service status."""
+
         return self.get(
             "/api/v1/ai-insights/status"
         )
@@ -327,6 +421,7 @@ class APIClient:
         self,
     ) -> dict[str, Any]:
         """Generate an executive portfolio AI report."""
+
         return self.get(
             "/api/v1/ai-insights/report"
         )
@@ -336,6 +431,7 @@ class APIClient:
         customer_id: str,
     ) -> dict[str, Any]:
         """Generate a customer-level AI insight."""
+
         return self.get(
             f"/api/v1/ai-insights/customer/{customer_id}"
         )
