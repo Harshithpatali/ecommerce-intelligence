@@ -1,0 +1,17 @@
+FastAPI
+Uvicorn
+Pydantic
+Pandas
+NumPy
+Scikit-learn
+XGBoost
+Joblib
+SHAP
+SQLAlchemy
+PostgreSQL driver
+python-dotenv
+Groq
+Plotly
+Streamlit
+Requests
+HTTPX
