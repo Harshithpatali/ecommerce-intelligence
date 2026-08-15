@@ -8,7 +8,7 @@ XGBoost
 Joblib
 SHAP
 SQLAlchemy
-PostgreSQL driver
+
 python-dotenv
 Groq
 Plotly
